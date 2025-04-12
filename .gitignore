@@ -1,0 +1,6 @@
+release.md
+*.exe
+*.test
+*.out
+.idea/
+.vscode/
