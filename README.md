@@ -31,6 +31,19 @@ __Development status:__
 
 ## Installation
 
+### Prerequisites:
+
+1. Install the ViGEmBus driver from [here](https://github.com/nefarius/ViGEmBus/releases).
+   - Download the latest release
+   - Run the installer
+   - Accept the license agreement
+   - Allow the installer to modify your PC
+   - Wait for completion and click "Finish"
+
+2. Install Go (version 1.16 or later) from [golang.org](https://golang.org/dl/).
+
+### Installing the library:
+
 ```bash
 go get github.com/CB2Moon/vgamepad-go
 ```
@@ -39,11 +52,11 @@ go get github.com/CB2Moon/vgamepad-go
 
 ## Getting started
 
-`vgamepad-go` provides two main Go types
-- `VX360Gamepad`, which emulates an XBox360 gamepad
-- `VDS4Gamepad`, which emulates a DualShock4 gamepad.
+**You need to run as admin**
 
-The state of a virtual gamepad (e.g. pressed buttons, joystick values) is called a report.
+`vgamepad-go` provides two main Go types: `VX360Gamepad`, which emulates an XBox360 gamepad, and `VDS4Gamepad`, which emulates a DualShock4 gamepad.
+
+The state of a virtual gamepad (e.g., pressed buttons, joystick values) is called a report.
 To modify the report, a number of user-friendly API functions are provided by `vgamepad-go`.
 When the report is modified as desired, it must be sent to the computer using the `Update()` method.
 
@@ -68,13 +81,13 @@ Buttons can be pressed and released through `PressButton` and `ReleaseButton`:
 ```go
 import (
     "github.com/CB2Moon/vgamepad-go/pkg/vgamepad"
-    "github.com/CB2Moon/vgamepad-go/pkg/commons"
+    "github.com/CB2Moon/vgamepad-go/internal/vigem"
 )
 
 // Press the A button
-gamepad.PressButton(commons.XUSB_GAMEPAD_A)
+gamepad.PressButton(vigem.XUSB_GAMEPAD_A)
 // Press the left hat button
-gamepad.PressButton(commons.XUSB_GAMEPAD_DPAD_LEFT)
+gamepad.PressButton(vigem.XUSB_GAMEPAD_DPAD_LEFT)
 
 // Send the updated state to the computer
 gamepad.Update()
@@ -82,7 +95,7 @@ gamepad.Update()
 // (...) A and left hat are pressed...
 
 // Release the A button
-gamepad.ReleaseButton(commons.XUSB_GAMEPAD_A)
+gamepad.ReleaseButton(vigem.XUSB_GAMEPAD_A)
 
 // Send the updated state to the computer
 gamepad.Update()
@@ -90,7 +103,7 @@ gamepad.Update()
 // (...) left hat is still pressed...
 ```
 
-All available buttons are defined in the `commons` package as `XUSBButton` type constants.
+All available buttons are defined in the `vigem` package as `XUSBButton` constants.
 
 To control the triggers (1 axis each) and the joysticks (2 axis each), two options are provided by the API.
 
@@ -140,7 +153,7 @@ import (
     "time"
 
     "github.com/CB2Moon/vgamepad-go/pkg/vgamepad"
-    "github.com/CB2Moon/vgamepad-go/pkg/commons"
+    "github.com/CB2Moon/vgamepad-go/internal/vigem"
 )
 
 func main() {
@@ -151,18 +164,18 @@ func main() {
     defer gamepad.Close()
 
     // Press a button to wake the device up
-    gamepad.PressButton(commons.XUSB_GAMEPAD_A)
+    gamepad.PressButton(vigem.XUSB_GAMEPAD_A)
     gamepad.Update()
     time.Sleep(500 * time.Millisecond)
-    gamepad.ReleaseButton(commons.XUSB_GAMEPAD_A)
+    gamepad.ReleaseButton(vigem.XUSB_GAMEPAD_A)
     gamepad.Update()
     time.Sleep(500 * time.Millisecond)
 
     // Press buttons and things
-    gamepad.PressButton(commons.XUSB_GAMEPAD_A)
-    gamepad.PressButton(commons.XUSB_GAMEPAD_LEFT_SHOULDER)
-    gamepad.PressButton(commons.XUSB_GAMEPAD_DPAD_DOWN)
-    gamepad.PressButton(commons.XUSB_GAMEPAD_DPAD_LEFT)
+    gamepad.PressButton(vigem.XUSB_GAMEPAD_A)
+    gamepad.PressButton(vigem.XUSB_GAMEPAD_LEFT_SHOULDER)
+    gamepad.PressButton(vigem.XUSB_GAMEPAD_DPAD_DOWN)
+    gamepad.PressButton(vigem.XUSB_GAMEPAD_DPAD_LEFT)
     gamepad.LeftTriggerFloat(0.5)
     gamepad.RightTriggerFloat(0.5)
     gamepad.LeftJoystickFloat(0.0, 0.2)
@@ -173,8 +186,8 @@ func main() {
     time.Sleep(1 * time.Second)
 
     // Release buttons and things
-    gamepad.ReleaseButton(commons.XUSB_GAMEPAD_A)
-    gamepad.ReleaseButton(commons.XUSB_GAMEPAD_DPAD_LEFT)
+    gamepad.ReleaseButton(vigem.XUSB_GAMEPAD_A)
+    gamepad.ReleaseButton(vigem.XUSB_GAMEPAD_DPAD_LEFT)
     gamepad.RightTriggerFloat(0.0)
     gamepad.RightJoystickFloat(0.0, 0.0)
 
@@ -209,33 +222,33 @@ Press and release buttons:
 ```go
 import (
     "github.com/CB2Moon/vgamepad-go/pkg/vgamepad"
-    "github.com/CB2Moon/vgamepad-go/pkg/commons"
+    "github.com/CB2Moon/vgamepad-go/internal/vigem"
 )
 
-gamepad.PressButton(commons.DS4_BUTTON_TRIANGLE)
+gamepad.PressButton(vigem.DS4_BUTTON_TRIANGLE)
 gamepad.Update()
 
 // (...)
 
-gamepad.ReleaseButton(commons.DS4_BUTTON_TRIANGLE)
+gamepad.ReleaseButton(vigem.DS4_BUTTON_TRIANGLE)
 gamepad.Update()
 ```
 
-Available buttons are defined in the `commons` package as `DS4Button` constants.
+Available buttons are defined in the `vigem` package as `DS4Button` constants.
 
 Press and release special buttons:
 
 ```go
-gamepad.PressSpecialButton(commons.DS4_SPECIAL_BUTTON_PS)
+gamepad.PressSpecialButton(vigem.DS4_SPECIAL_BUTTON_PS)
 gamepad.Update()
 
 // (...)
 
-gamepad.ReleaseSpecialButton(commons.DS4_SPECIAL_BUTTON_PS)
+gamepad.ReleaseSpecialButton(vigem.DS4_SPECIAL_BUTTON_PS)
 gamepad.Update()
 ```
 
-Special buttons are defined in the `commons` package as `DS4SpecialButton` type constants.
+Special buttons are defined in the `vigem` package as `DS4SpecialButton` constants.
 
 Triggers and joysticks (integer values):
 
@@ -270,11 +283,11 @@ gamepad.Update()
 Directional pad (hat):
 
 ```go
-gamepad.DirectionalPad(commons.DS4_BUTTON_DPAD_NORTHWEST)
+gamepad.DirectionalPad(vigem.DS4_BUTTON_DPAD_NORTHWEST)
 gamepad.Update()
 ```
 
-Directions for the directional pad are defined in the `commons` package as `DS4DPadDirection` constants.
+Directions for the directional pad are defined in the `vigem` package as `DS4DPadDirection` constants.
 
 Reset to default state:
 
@@ -292,7 +305,7 @@ import (
     "time"
 
     "github.com/CB2Moon/vgamepad-go/pkg/vgamepad"
-    "github.com/CB2Moon/vgamepad-go/pkg/commons"
+    "github.com/CB2Moon/vgamepad-go/internal/vigem"
 )
 
 func main() {
@@ -303,19 +316,19 @@ func main() {
     defer gamepad.Close()
 
     // Press a button to wake the device up
-    gamepad.PressButton(commons.DS4_BUTTON_TRIANGLE)
+    gamepad.PressButton(vigem.DS4_BUTTON_TRIANGLE)
     gamepad.Update()
     time.Sleep(500 * time.Millisecond)
-    gamepad.ReleaseButton(commons.DS4_BUTTON_TRIANGLE)
+    gamepad.ReleaseButton(vigem.DS4_BUTTON_TRIANGLE)
     gamepad.Update()
     time.Sleep(500 * time.Millisecond)
 
     // Press buttons and things
-    gamepad.PressButton(commons.DS4_BUTTON_TRIANGLE)
-    gamepad.PressButton(commons.DS4_BUTTON_CIRCLE)
-    gamepad.PressButton(commons.DS4_BUTTON_THUMB_RIGHT)
-    gamepad.PressButton(commons.DS4_BUTTON_TRIGGER_LEFT)
-    gamepad.PressSpecialButton(commons.DS4_SPECIAL_BUTTON_TOUCHPAD)
+    gamepad.PressButton(vigem.DS4_BUTTON_TRIANGLE)
+    gamepad.PressButton(vigem.DS4_BUTTON_CIRCLE)
+    gamepad.PressButton(vigem.DS4_BUTTON_THUMB_RIGHT)
+    gamepad.PressButton(vigem.DS4_BUTTON_TRIGGER_LEFT)
+    gamepad.PressSpecialButton(vigem.DS4_SPECIAL_BUTTON_TOUCHPAD)
     gamepad.LeftTriggerFloat(0.5)
     gamepad.RightTriggerFloat(0.5)
     gamepad.LeftJoystickFloat(0.0, 0.2)
@@ -326,7 +339,7 @@ func main() {
     time.Sleep(1 * time.Second)
 
     // Release buttons and things
-    gamepad.ReleaseButton(commons.DS4_BUTTON_TRIANGLE)
+    gamepad.ReleaseButton(vigem.DS4_BUTTON_TRIANGLE)
     gamepad.RightTriggerFloat(0.0)
     gamepad.RightJoystickFloat(0.0, 0.0)
 

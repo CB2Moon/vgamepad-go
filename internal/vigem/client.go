@@ -1,6 +1,7 @@
 package vigem
 
 import (
+	"embed"
 	"fmt"
 	"os"
 	"os/exec"
@@ -12,6 +13,10 @@ import (
 
 	"github.com/CB2Moon/vgamepad-go/pkg/commons"
 )
+
+//go:embed resources/client/x64/ViGEmClient.dll resources/client/x86/ViGEmClient.dll
+//go:embed resources/install/x64/ViGEmBusSetup_x64.msi resources/install/x86/ViGEmBusSetup_x86.msi
+var embeddedFiles embed.FS
 
 // ViGEmBus version
 const VIGEMBUS_VERSION = "1.17.333.0"
@@ -54,32 +59,16 @@ func NewViGEmClient() (*ViGEmClient, error) {
 		return nil, fmt.Errorf("ViGEmClient is only supported on Windows")
 	}
 
-	// Determine architecture
-	var arch string
-	if runtime.GOARCH == "amd64" {
-		arch = "x64"
-	} else if runtime.GOARCH == "386" {
-		arch = "x86"
-	} else {
-		return nil, fmt.Errorf("unsupported architecture: %s", runtime.GOARCH)
-	}
-
 	// Check if ViGEmBus is installed and install if needed
-	err := ensureViGEmBusInstalled(arch)
+	err := ensureViGEmBusInstalled()
 	if err != nil {
 		return nil, fmt.Errorf("failed to ensure ViGEmBus is installed: %w", err)
 	}
 
-	// Load the DLL
-	exePath, err := os.Executable()
+	// Extract DLL to temporary location and load it
+	dllPath, err := extractDLL()
 	if err != nil {
-		return nil, fmt.Errorf("failed to get executable path: %w", err)
-	}
-
-	dllPath := filepath.Join(filepath.Dir(exePath), "ViGEmClient.dll")
-	if _, err := os.Stat(dllPath); os.IsNotExist(err) {
-		// If DLL is not in the executable directory, use the embedded one
-		dllPath = filepath.Join(".", "vigem", "client", arch, "ViGEmClient.dll")
+		return nil, fmt.Errorf("failed to extract DLL: %w", err)
 	}
 
 	dll, err := syscall.LoadDLL(dllPath)
@@ -215,29 +204,145 @@ func NewViGEmClient() (*ViGEmClient, error) {
 	return client, nil
 }
 
-// ensureViGEmBusInstalled checks if ViGEmBus is installed and installs it if needed
-func ensureViGEmBusInstalled(arch string) error {
-	// Check if ViGEmBus is installed
-	cmd := exec.Command("reg", "query", `HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall`, "/s")
-	output, err := cmd.Output()
-	if err != nil {
-		return fmt.Errorf("failed to query registry: %w", err)
+// getArch returns the architecture ("x64" for amd64 and "x86" for 386) of the current system
+func getArch() (string, error) {
+	var arch string
+	if runtime.GOARCH == "amd64" {
+		arch = "x64"
+	} else if runtime.GOARCH == "386" {
+		arch = "x86"
+	} else {
+		return "", fmt.Errorf("unsupported architecture: %s", runtime.GOARCH)
+	}
+	return arch, nil
+}
+
+// extractDLL extracts the appropriate DLL to a temporary directory and returns its path
+func extractDLL() (string, error) {
+	// Create a temporary directory for the DLL
+	tempDir := filepath.Join(os.TempDir(), "vgamepad-go")
+	if err := os.MkdirAll(tempDir, 0755); err != nil {
+		return "", fmt.Errorf("failed to create temp directory: %w", err)
 	}
 
-	// Check if ViGEmBus is in the registry output
-	if !strings.Contains(strings.ToLower(string(output)), "nefarius virtual gamepad emulation bus driver") {
-		// Install ViGEmBus
-		msiPath := filepath.Join(".", "vigem", "install", arch, fmt.Sprintf("ViGEmBusSetup_%s.msi", arch))
-		cmd = exec.Command("msiexec", "/i", msiPath)
-		cmd.Stdout = os.Stdout
-		cmd.Stderr = os.Stderr
-		err = cmd.Run()
-		if err != nil {
-			return fmt.Errorf("failed to install ViGEmBus: %w", err)
+	// Path for extracted DLL
+	dllPath := filepath.Join(tempDir, "ViGEmClient.dll")
+
+	// Check if DLL exists and is current
+	if _, err := os.Stat(dllPath); err == nil {
+		// DLL exists, we can use it
+		return dllPath, nil
+	}
+
+	arch, err := getArch()
+	if err != nil {
+		return "", fmt.Errorf("failed to get architecture: %w", err)
+	}
+
+	// Extract the DLL from embedded files
+	embeddedPath := fmt.Sprintf("resources/client/%s/ViGEmClient.dll", arch)
+	dllData, err := embeddedFiles.ReadFile(embeddedPath)
+	if err != nil {
+		return "", fmt.Errorf("failed to read embedded DLL: %w", err)
+	}
+
+	// Write the DLL to the temporary location
+	if err := os.WriteFile(dllPath, dllData, 0644); err != nil {
+		return "", fmt.Errorf("failed to write DLL to temp location: %w", err)
+	}
+
+	return dllPath, nil
+}
+
+// ensureViGEmBusInstalled checks if ViGEmBus is installed and installs it if needed
+func ensureViGEmBusInstalled() error {
+	// Check if ViGEmBus is already installed
+	installed, err := isViGEmBusInstalled()
+	if err != nil {
+		return fmt.Errorf("failed to check if ViGEmBus is installed: %w", err)
+	}
+
+	if installed {
+		return nil
+	}
+
+	arch, err := getArch()
+	if err != nil {
+		return fmt.Errorf("failed to get architecture: %w", err)
+	}
+
+	// Extract the MSI from embedded files
+	embeddedPath := fmt.Sprintf("resources/install/%s/ViGEmBusSetup_%s.msi", arch, arch)
+	msiData, err := embeddedFiles.ReadFile(embeddedPath)
+	if err != nil {
+		return fmt.Errorf("failed to read embedded MSI: %w", err)
+	}
+
+	// Write MSI to a temporary directory
+	tempDir := filepath.Join(os.TempDir(), "vgamepad-go")
+	if err := os.MkdirAll(tempDir, 0755); err != nil {
+		return fmt.Errorf("failed to create temp directory: %w", err)
+	}
+
+	msiPath := filepath.Join(tempDir, fmt.Sprintf("ViGEmBusSetup_%s.msi", arch))
+	if err := os.WriteFile(msiPath, msiData, 0644); err != nil {
+		return fmt.Errorf("failed to write MSI to temp location: %w", err)
+	}
+
+	// Run the installer
+	cmd := exec.Command("msiexec", "/i", msiPath, "/quiet", "/norestart")
+	err = cmd.Run()
+	if err != nil {
+		if exitErr, ok := err.(*exec.ExitError); ok && exitErr.ExitCode() == 1603 {
+			return fmt.Errorf("failed to run installer (exit code 1603) - You may need to run as administrator: %w", err)
 		}
+		return fmt.Errorf("failed to run installer: %w", err)
 	}
 
 	return nil
+}
+
+// isViGEmBusInstalled checks if ViGEmBus is installed
+func isViGEmBusInstalled() (bool, error) {
+	// Try a quick way first - create a test gamepad
+	testDllPath, err := extractDLL()
+	if err == nil {
+		dll, err := syscall.LoadDLL(testDllPath)
+		if err == nil {
+			// Successfully loaded DLL, try to use it
+			defer dll.Release()
+
+			criticalProcs := []string{
+				"vigem_alloc",
+				"vigem_connect",
+				"vigem_disconnect",
+				"vigem_free",
+			}
+
+			for _, procName := range criticalProcs {
+				proc, err := dll.FindProc(procName)
+				if err != nil {
+					return false, nil
+				}
+				_, _, err = proc.Call()
+				if err != nil {
+					return false, nil
+				}
+			}
+
+			return true, nil
+		}
+	}
+
+	fmt.Println("Checking registry for ViGEmBus installation...")
+	// Fallback to registry check
+	cmd := exec.Command("reg", "query", `HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall`, "/s")
+	output, err := cmd.Output()
+	if err != nil {
+		return false, fmt.Errorf("failed to query registry: %w", err)
+	}
+
+	return strings.Contains(strings.ToLower(string(output)), "nefarius virtual gamepad emulation bus driver"), nil
 }
 
 // Alloc allocates an object representing a driver connection
